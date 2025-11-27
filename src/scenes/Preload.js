@@ -12,7 +12,6 @@ class Preload extends Phaser.Scene {
     }
 
     create() {
-        // Después de cargar todo, vamos al menú
         this.scene.start("Menu");
     }
 }

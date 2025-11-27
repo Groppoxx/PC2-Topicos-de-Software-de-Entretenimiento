@@ -3,29 +3,6 @@ import FallingEntity from "../prefabs/FallingEntity";
 import FallingVehicle from "../prefabs/FallingVehicle";
 import PlayerVehicle from "../prefabs/PlayerVehicle";
 
-// =========================
-// Configuración del juego
-// =========================
-const CONFIG = {
-    MAX_LIVES: 5,
-    INITIAL_LIVES: 3,
-
-    // Tiempos (en milisegundos)
-    INITIAL_SPAWN_DELAY: 7000,  // 7 s entre spawns inicial
-    MIN_SPAWN_DELAY: 4000,      // mínimo 4 s
-    SPAWN_STEP: 200,            // reduce 0.2 s
-
-    GAMEOVER_DELAY: 2500,       // 2.5 s para mostrar Game Over
-    RETURN_MENU_DELAY: 3500,    // 3.5 s para volver al menú
-
-    // Velocidades (en píxeles/segundo)
-    PLAYER_SPEED: 220,
-    FALLING_SPEED: 150,
-
-    // Fondo
-    BACKGROUND_SPEED: 4,
-};
-
 class Game extends Phaser.Scene {
     constructor() {
         super("Game");
@@ -35,55 +12,45 @@ class Game extends Phaser.Scene {
         const width = this.scale.width;
         const height = this.scale.height;
 
-        // --- Fondo en movimiento ---
         this.road = this.add
             .tileSprite(0, 0, width, height, "road")
             .setOrigin(0, 0);
-        this.backgroundSpeed = CONFIG.BACKGROUND_SPEED;
+        this.backgroundSpeed = 4;
 
-        // --- Estado de juego ---
         this.isGameOver = false;
 
-        this.maxLives = CONFIG.MAX_LIVES;
-        this.lives = CONFIG.INITIAL_LIVES;
+        this.maxLives = 5;
+        this.lives = 3;
 
-        this.currentSpawnDelay = CONFIG.INITIAL_SPAWN_DELAY;
+        this.currentSpawnDelay = 7000;
 
-        // --- Vehicle del jugador (prefab) ---
         this.player = new PlayerVehicle(
             this,
             width / 2,
             height - 60,
-            CONFIG.PLAYER_SPEED
+            220
         );
 
-        // --- HUD de vidas ---
         this.hudGroup = this.add.group();
         this.drawHUD();
 
-        // --- Grupo de objetos que caen ---
         this.fallingGroup = this.physics.add.group();
 
-        // --- Input teclado ---
         this.cursors = this.input.keyboard.createCursorKeys();
 
-        // --- Seguir mouse/touch solo en X ---
         this.input.on("pointermove", (pointer) => {
             if (!this.player || this.isGameOver) return;
             this.player.followPointerX(pointer.x, width);
         });
 
-        // --- Timer para spawns ---
         this.spawnEvent = this.time.addEvent({
             delay: this.currentSpawnDelay,
             loop: true,
             callback: () => this.spawnFallingObject(),
         });
 
-        // Primer spawn inmediato para no esperar
         this.spawnFallingObject();
 
-        // --- Colisiones ---
         this.physics.add.overlap(
             this.player,
             this.fallingGroup,
@@ -93,9 +60,6 @@ class Game extends Phaser.Scene {
         );
     }
 
-    // =========================
-    // HUD de vidas
-    // =========================
     drawHUD() {
         this.hudGroup.clear(true, true);
 
@@ -108,10 +72,6 @@ class Game extends Phaser.Scene {
         }
     }
 
-    // =========================
-    // Spawns
-    // =========================
-    // Crea un nuevo objeto que cae (enemigo o vehicle) usando prefabs separados
     spawnFallingObject() {
         if (this.isGameOver) return;
 
@@ -123,26 +83,22 @@ class Game extends Phaser.Scene {
         let obj;
 
         if (isEnemy) {
-            // Enemigo: obstacle que cae
             obj = new FallingEntity(this, x, -30, "obstacle", "enemy");
         } else {
-            // Vehicle: car verde que da vida
             obj = new FallingVehicle(this, x, -30);
         }
 
-        // Lo metemos al grupo de físicas existente
         this.fallingGroup.add(obj);
     }
 
     increaseDifficulty() {
-        if (this.currentSpawnDelay <= CONFIG.MIN_SPAWN_DELAY) return;
+        if (this.currentSpawnDelay <= 4000) return;
 
         this.currentSpawnDelay = Math.max(
-            CONFIG.MIN_SPAWN_DELAY,
-            this.currentSpawnDelay - CONFIG.SPAWN_STEP
+            4000,
+            this.currentSpawnDelay - 200
         );
 
-        // Reiniciar el timer con el nuevo delay
         if (this.spawnEvent) {
             this.spawnEvent.remove(false);
         }
@@ -154,9 +110,6 @@ class Game extends Phaser.Scene {
         });
     }
 
-    // =========================
-    // Colisiones y vidas
-    // =========================
     handleCollision(player, obj) {
         if (!obj || this.isGameOver) return;
 
@@ -191,24 +144,18 @@ class Game extends Phaser.Scene {
         }
     }
 
-    // =========================
-    // Game Over
-    // =========================
     triggerGameOver() {
         if (this.isGameOver) return;
         this.isGameOver = true;
 
-        // Pausamos física y spawns
         this.physics.world.pause();
         if (this.spawnEvent) this.spawnEvent.remove(false);
 
-        // Destruimos elementos en pantalla
         this.fallingGroup.clear(true, true);
         this.hudGroup.clear(true, true);
         if (this.player) this.player.destroy();
 
-        // Mostrar "Game Over" luego de un tiempo reducido
-        this.time.delayedCall(CONFIG.GAMEOVER_DELAY, () => {
+        this.time.delayedCall(2500, () => {
             const width = this.scale.width;
             const height = this.scale.height;
 
@@ -220,39 +167,31 @@ class Game extends Phaser.Scene {
                 })
                 .setOrigin(0.5);
 
-            // Volver al menú un poco más rápido
-            this.time.delayedCall(CONFIG.RETURN_MENU_DELAY, () => {
+            this.time.delayedCall(3500, () => {
                 this.scene.start("Menu");
             });
         });
     }
 
-    // =========================
-    // Update
-    // =========================
     update(time, delta) {
-        // Mover fondo
         this.road.tilePositionY += this.backgroundSpeed;
 
         if (this.isGameOver || !this.player) return;
 
         const width = this.scale.width;
-        const dt = delta / 1000; // segundos
+        const dt = delta / 1000;
 
-        // Movimiento del jugador delegando al prefab
         this.player.updateMovement(this.cursors, dt, width);
 
-        // --- Movimiento de enemigos/vehicles que caen ---
         this.fallingGroup.getChildren().forEach((obj) => {
             if (!obj) return;
 
-            obj.y += CONFIG.FALLING_SPEED * dt;
+            obj.y += 150 * dt;
 
             if (obj.y > this.scale.height + 40) {
                 const type = obj.getData("type");
 
                 if (type === "vehicle") {
-                    // Si el vehicle sale del escenario -> sube dificultad
                     this.increaseDifficulty();
                 }
 
